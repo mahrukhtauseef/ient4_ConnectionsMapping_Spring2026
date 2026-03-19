@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinkedIn Network Visualizer</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f7f4; color: #1a1a1a; padding: 1.5rem; }
+.dash { max-width: 1100px; margin: 0 auto; }
+h1 { font-size: 22px; font-weight: 500; margin-bottom: 1.5rem; }
+.nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.nav button { font-size: 13px; padding: 6px 14px; border-radius: 20px; border: 1px solid #ccc; background: transparent; color: #666; cursor: pointer; transition: all 0.15s; }
+.nav button.active { background: #1a1a1a; color: #fff; border-color: transparent; }
+.nav button:hover:not(.active) { background: #f0f0f0; color: #1a1a1a; }
+.panel { display: none; }
+.panel.active { display: block; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 1.5rem; }
+.metric { background: #efefeb; border-radius: 8px; padding: 14px 16px; }
+.metric-label { font-size: 12px; color: #666; margin-bottom: 4px; }
+.metric-value { font-size: 26px; font-weight: 500; }
+.metric-sub { font-size: 11px; color: #999; margin-top: 2px; }
+.section-title { font-size: 12px; font-weight: 500; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+.chart-wrap { position: relative; width: 100%; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+@media(max-width:600px){ .two-col { grid-template-columns: 1fr; } }
+.card { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+.wordcloud { display: flex; flex-wrap: wrap; gap: 6px; padding: 0.75rem 0; align-items: center; }
+.word { padding: 4px 10px; border-radius: 20px; cursor: default; transition: transform 0.1s; }
+.word:hover { transform: scale(1.08); }
+.shared-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+.shared-item:last-child { border-bottom: none; }
+.badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
+.badge-blue { background: #E6F1FB; color: #0C447C; }
+.badge-teal { background: #E1F5EE; color: #085041; }
+.badge-coral { background: #FAECE7; color: #712B13; }
+.badge-amber { background: #FAEEDA; color: #633806; }
+.badge-purple { background: #EEEDFE; color: #3C3489; }
+.sub-names { font-size: 12px; color: #888; margin-top: 2px; }
+.bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.bar-label { font-size: 12px; color: #555; width: 160px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-track { flex: 1; height: 8px; background: #f0f0f0; border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 4px; }
+.bar-count { font-size: 12px; color: #999; width: 28px; text-align: right; flex-shrink: 0; }
+.search-box { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #1a1a1a; font-size: 14px; margin-bottom: 1rem; outline: none; }
+.search-box:focus { border-color: #999; }
+.conn-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.conn-table th { text-align: left; padding: 8px 10px; color: #888; font-weight: 500; border-bottom: 1px solid #e5e5e5; font-size: 12px; }
+.conn-table td { padding: 8px 10px; border-bottom: 1px solid #f5f5f5; vertical-align: top; }
+.conn-table tr:hover td { background: #fafafa; }
+.conn-link { color: #185FA5; text-decoration: none; font-size: 11px; }
+.conn-link:hover { text-decoration: underline; }
+.pill { font-size: 11px; color: #888; background: #f0f0f0; padding: 2px 7px; border-radius: 10px; display: inline-block; }
+.page-info { font-size: 12px; color: #999; margin-bottom: 8px; }
+.page-btn { font-size: 13px; padding: 5px 14px; border-radius: 8px; border: 1px solid #ddd; background: #fff; color: #555; cursor: pointer; }
+.page-btn:disabled { opacity: 0.35; cursor: default; }
+</style>
+</head>
+<body>
+<div class="dash">
+<h1>LinkedIn Network Visualizer</h1>
+
+<div class="nav">
+  <button class="active" onclick="showPanel('overview',this)">Overview</button>
+  <button onclick="showPanel('companies',this)">Companies</button>
+  <button onclick="showPanel('shared',this)">Common connections</button>
+  <button onclick="showPanel('paths',this)">Connection paths</button>
+  <button onclick="showPanel('skills',this)">Expertise cloud</button>
+  <button onclick="showPanel('browse',this)">Browse all</button>
+</div>
+
+<!-- OVERVIEW -->
+<div id="panel-overview" class="panel active">
+  <div class="metrics">
+    <div class="metric"><div class="metric-label">Total connections</div><div class="metric-value">414</div><div class="metric-sub">unique named people</div></div>
+    <div class="metric"><div class="metric-label">Submitters</div><div class="metric-value">41</div><div class="metric-sub">students</div></div>
+    <div class="metric"><div class="metric-label">Unique orgs</div><div class="metric-value">352</div><div class="metric-sub">companies & institutions</div></div>
+    <div class="metric"><div class="metric-label">Shared connections</div><div class="metric-value">3</div><div class="metric-sub">people in 2+ lists</div></div>
+    <div class="metric"><div class="metric-label">Shared orgs</div><div class="metric-value">8</div><div class="metric-sub">orgs in 2+ lists</div></div>
+    <div class="metric"><div class="metric-label">Via Vanderbilt</div><div class="metric-value">43%</div><div class="metric-sub">of all connections</div></div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <div class="section-title">Connection path breakdown</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="pathChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Top role keywords</div>
+      <div id="rolesBar"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-title">Connections submitted per student</div>
+    <div class="chart-wrap" style="height:200px"><canvas id="subChart"></canvas></div>
+  </div>
+</div>
+
+<!-- COMPANIES -->
+<div id="panel-companies" class="panel">
+  <div class="card">
+    <div class="section-title">Most represented organizations</div>
+    <div id="orgBars"></div>
+  </div>
+  <div class="card">
+    <div class="section-title">Organizations appearing in multiple students' lists</div>
+    <div id="sharedOrgs"></div>
+  </div>
+</div>
+
+<!-- SHARED -->
+<div id="panel-shared" class="panel">
+  <div class="card">
+    <div class="section-title">People appearing in multiple students' lists</div>
+    <div id="sharedPeople"></div>
+  </div>
+  <div class="card">
+    <div class="section-title">Students with most connections submitted</div>
+    <div id="topStudents"></div>
+  </div>
+</div>
+
+<!-- PATHS -->
+<div id="panel-paths" class="panel">
+  <div class="two-col">
+    <div class="card">
+      <div class="section-title">How students know their connections</div>
+      <div class="chart-wrap" style="height:260px"><canvas id="pathBar"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Path keyword cloud</div>
+      <div id="pathCloud"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SKILLS -->
+<div id="panel-skills" class="panel">
+  <div class="card">
+    <div class="section-title">Why these people are relevant — expertise themes</div>
+    <div id="whyCloud"></div>
+  </div>
+  <div class="card">
+    <div class="section-title">Top role title keywords in the network</div>
+    <div id="roleBars2"></div>
+  </div>
+</div>
+
+<!-- BROWSE -->
+<div id="panel-browse" class="panel">
+  <input class="search-box" type="text" id="searchInput" placeholder="Search by name, company, role, or student..." oninput="filterTable()">
+  <div class="page-info" id="pageInfo"></div>
+  <div style="overflow-x:auto">
+    <table class="conn-table">
+      <thead><tr><th>Name</th><th>Role</th><th>Organization</th><th>Student</th><th>LinkedIn</th></tr></thead>
+      <tbody id="connBody"></tbody>
+    </table>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+    <button class="page-btn" id="prevBtn" onclick="changePage(-1)">&#8592; Prev</button>
+    <span id="pageNum" style="font-size:13px;color:#888"></span>
+    <button class="page-btn" id="nextBtn" onclick="changePage(1)">Next &#8594;</button>
+  </div>
+</div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const DATA = {
+  path_cats: {"Work":69,"Vanderbilt":176,"Alma Mater":58,"Other":78,"Personal":8,"Military":24,"Professional Network":6},
+  org_freq: {"Vanderbilt (all)":28,"Latham & Watkins LLP":5,"Uber":4,"Veteran's Affairs":4,"Google":3,"Premise Health":3,"Meta":3,"Accenture":3,"Schneider Electric":3,"UnityAI":2,"WYSE":2,"Sidley Austin LLP":2,"Kirkland & Ellis LLP":2,"Nike":2,"In-N-Out":2,"Brown Bag":2,"Happenstance Whiskey":2,"Daily Crunch":2,"Amazon (AWS)":2},
+  role_freq: {"founder":73,"director":42,"manager":41,"partner":21,"senior":20,"associate":17,"president":17,"owner":16,"managing":14,"product":13,"executive":12,"investor":12,"officer":11,"entrepreneur":11,"marketing":11,"principal":10,"chief":10,"engineer":8,"strategy":9,"operations":8},
+  why_freq: {"founder":94,"experience":89,"business":63,"manager":47,"director":46,"product":42,"investor":33,"partner":32,"data":30,"insight":30,"marketing":30,"startup":28,"strategy":27,"venture":27,"development":26,"industry":25,"owner":25,"tech":20,"entrepreneur":20,"healthcare":18,"finance":18,"brand":18,"social":17,"executive":17,"building":17,"engineer":15,"management":14,"medical":14,"platform":13,"digital":12,"engineering":12,"software":11,"marketplace":11},
+  path_freq: {"vanderbilt":132,"owen":60,"alum":33,"undergrad":26,"network":25,"alma":24,"mater":24,"university":24,"connection":22,"undergraduate":21,"school":21,"alumni":17,"grad":16,"mutual":15,"class":14,"professional":14,"usma":9,"army":8,"nashville":8,"military":7,"friend":6,"deloitte":4,"goldman":4,"usmc":4},
+  shared_orgs: [["Vanderbilt (all)",["Akshay Dang","Darryl Delsoin","Emma Ye","Hannah Matthews","Mark Marchetti","Pat Ellison","Pete Goris","Tarek Bhiku","Tristan Carico"]],["Meta",["Amisha Shreya","Dozie Nwachuku","Micky Sangimino"]],["Google",["Amisha Shreya","Gabriel Odeyemi"]],["Nike",["Jacob Latts","Rowan Baird"]],["Happenstance Whiskey",["Hannah Garey","Nick Dailey"]],["Daily Crunch",["Hannah Garey","Nick Dailey"]],["Uber",["Dozie Nwachuku","Liam Kang"]],["AgaveTex",["Jonathan Wilcox","Tanner Burningham"]]],
+  shared_people: [["Laurel Orley",["Hannah Garey","Nick Dailey"]],["Britney Chia",["Dozie Nwachuku","Liam Kang"]],["Ander de Olloqui Albarrán",["Jonathan Wilcox","Tanner Burningham"]]],
+  sub_counts: {"Alex Elliott":10,"Callie Frey":10,"Hannah Matthews":10,"Cole Andrekus":10,"Darryl Delsoin":10,"Mitul Patel":10,"Courtney Zettel":10,"Gabriel Odeyemi":10,"Pat Ellison":10,"Mark Marchetti":10,"Adam Morris":10,"Pete Goris":10,"Emma Ye":10,"Akshay Dang":10,"Zach Greene":10,"Jacob Latts":10,"Michael Thomas":10,"Rieves Berry":10,"Nick Dailey":11,"Rowan Baird":10,"Dozie Nwachuku":10,"Matthew McMillan":10,"Tristan Carico":10,"Micky Sangimino":10,"Tyler Ingebrigtsen":10,"Mike Buckley":17,"Hannah Garey":10,"Amisha Shreya":10,"Liam Kang":10,"Laird George":10,"Shawn Metzgar":10,"Jordan Dunn":10,"Tarek Bhiku":10,"Conor Keenan":10,"Carter Swayze":10,"Anna Hyman":10,"Tanner Burningham":10,"Will Smith":10,"Jonathan Wilcox":10,"Connor Laffler":10,"Lauren McElroy":11}
+};
+
+const CONNECTIONS = [
+  {name:"Chris Downs",role:"Founder",org:"Dozen Software",linkedin:"https://www.linkedin.com/in/chrisdownstn/",student:"Alex Elliott"},
+  {name:"Brian Fox",role:"Founder",org:"Confirmation.com",linkedin:"https://www.linkedin.com/in/brianfoxcpa/",student:"Alex Elliott"},
+  {name:"Logan Brown",role:"Founder",org:"Soxton",linkedin:"https://www.linkedin.com/in/logan-brown-03765552/",student:"Alex Elliott"},
+  {name:"Shannon Smith",role:"Founder",org:"Yak Tech",linkedin:"https://www.linkedin.com/in/shannon-smith-cisa/",student:"Alex Elliott"},
+  {name:"Dan Bailey",role:"CEO",org:"Iowa PC Services",linkedin:"https://www.linkedin.com/in/baileygoat/",student:"Alex Elliott"},
+  {name:"Jason Parker",role:"Co-Founder",org:"UnityAI",linkedin:"https://www.linkedin.com/in/jasonthomasparker/",student:"Alex Elliott"},
+  {name:"David L. Duke",role:"Senior Director IT & Analytics",org:"Eli Lily",linkedin:"https://www.linkedin.com/in/davidlduke/",student:"Alex Elliott"},
+  {name:"Keith Perry",role:"SVP",org:"St. Jude Childrens Hospital",linkedin:"https://www.linkedin.com/in/keith-perry-8562347/",student:"Alex Elliott"},
+  {name:"Brittani Roberts",role:"Principal",org:"FINTOP Capital",linkedin:"https://www.linkedin.com/in/brittani-roberts-28346417/",student:"Alex Elliott"},
+  {name:"Josh Johnson",role:"Director of Training and Outreach",org:"Sexual Assault Center",linkedin:"https://www.linkedin.com/in/josh-johnson-59598b41/",student:"Callie Frey"},
+  {name:"Julie Chor",role:"Associate Professor",org:"UChicago Medicine",linkedin:"https://www.uchicagomedicine.org/find-a-physician/physician/julie-chor",student:"Callie Frey"},
+  {name:"Melissa Pierce",role:"Chair Emeritus",org:"WYSE",linkedin:"https://www.linkedin.com/in/melissa-pierce-842b431/",student:"Callie Frey"},
+  {name:"Evelyn Rodriguez Estrada",role:"Development Co-Chair",org:"WYSE",linkedin:"https://www.linkedin.com/in/evelynrodriguez19/",student:"Callie Frey"},
+  {name:"Ali Khan",role:"Chief Medical Officer",org:"CVS/Aetna",linkedin:"https://www.linkedin.com/in/alikhan28/",student:"Callie Frey"},
+  {name:"Bonnie Miller",role:"Professor of Medical Education",org:"Vanderbilt (all)",linkedin:"https://www.vumc.org/global-health/person/bonnie-miller-md",student:"Callie Frey"},
+  {name:"Paul Kusserow",role:"Executive Chairman",org:"Unified Women's Healthcare",linkedin:"https://www.linkedin.com/in/paul-kusserow-b6b9454/",student:"Callie Frey"},
+  {name:"Ruby Mendenhall",role:"Professor",org:"University of Illinois",linkedin:"https://www.linkedin.com/in/ruby-mendenhall-4061981b/",student:"Callie Frey"},
+  {name:"Meghana Chandra",role:"Research Scientist",org:"NORC at Uchicago",linkedin:"https://www.linkedin.com/in/meghana-chandra/",student:"Callie Frey"},
+  {name:"Heather Davidson",role:"Associate Professor",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/heather-davidson-b196746/",student:"Callie Frey"},
+  {name:"Joanne Crevoiserat",role:"CEO",org:"Tapestry",linkedin:"https://www.linkedin.com/in/joanne-crevoiserat/",student:"Hannah Matthews"},
+  {name:"Ben Clark",role:"Sr. Application Developer",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/ben-clark-7590b74/",student:"Hannah Matthews"},
+  {name:"David Kloeppel",role:"Co-Founder, CEO",org:"Groups360",linkedin:"https://www.linkedin.com/in/davidkloeppel/",student:"Hannah Matthews"},
+  {name:"Teddy Dinker",role:"Managing Partner",org:"Dinkly",linkedin:"https://www.linkedin.com/in/teddy-dinker-47579629/",student:"Hannah Matthews"},
+  {name:"Stephanie Verheyen",role:"Director",org:"Astro Pak Corporation",linkedin:"https://www.linkedin.com/in/stephanie-ashton-797543123/",student:"Hannah Matthews"},
+  {name:"David Hornsby",role:"Owner",org:"Executive Travel & Parking",linkedin:"https://www.linkedin.com/in/david-hornsby-421a90b/",student:"Hannah Matthews"},
+  {name:"Selom Agbitor",role:"Co-Founder, CEO",org:"Mad Rabbit",linkedin:"https://www.linkedin.com/in/selom-agbitor-a15183120/",student:"Hannah Matthews"},
+  {name:"Brian Vujnovic",role:"Co-Founder, CEO",org:"MIA Hospitality Management",linkedin:"https://www.linkedin.com/in/brian-vujnovic-08babb3/",student:"Hannah Matthews"},
+  {name:"David Hirsh",role:"Founder, CEO",org:"Atrium Apparel Corporation",linkedin:"https://www.linkedin.com/in/davidjhirsh/",student:"Hannah Matthews"},
+  {name:"Ben Goodwin",role:"Co-Founder, CEO",org:"Oilpop",linkedin:"https://www.linkedin.com/in/ben-goodwin-olipop/",student:"Hannah Matthews"},
+  {name:"Joshua Cross",role:"Software Engineer",org:"Robyn",linkedin:"https://www.linkedin.com/in/joshuaalexandercross",student:"Cole Andrekus"},
+  {name:"Prajesh Pradhananga",role:"Principal Application Developer",org:"Salt River Project",linkedin:"https://www.linkedin.com/in/prajesh-pradhananga",student:"Cole Andrekus"},
+  {name:"Larisa Hovannisian",role:"Social Entrepreneur, Founder",org:"Kizazi",linkedin:"https://www.linkedin.com/in/larisahovannisian",student:"Cole Andrekus"},
+  {name:"Corey O'Connell",role:"Service Member",org:"We Energies",linkedin:"https://www.linkedin.com/in/corey-o-connell-mba-0b072171",student:"Cole Andrekus"},
+  {name:"Henry M Banh",role:"Marketing Director, Co-Founder",org:"LinkMode Digital Marketing",linkedin:"https://www.linkedin.com/in/henrybanh",student:"Cole Andrekus"},
+  {name:"Chris Latam",role:"Director of Sales and Marketing",org:"Fire for Effect Marketing",linkedin:"https://www.linkedin.com/in/chris-latam-b97321a",student:"Cole Andrekus"},
+  {name:"Chris Miorin",role:"CFO and COO",org:"apexanalytix",linkedin:"https://www.linkedin.com/in/chrismiorin",student:"Cole Andrekus"},
+  {name:"Britne Long",role:"Digital Strategist, Founder",org:"VVV Digitals LLC",linkedin:"https://www.linkedin.com/in/britne-long",student:"Cole Andrekus"},
+  {name:"Alex Taggart",role:"Application Developer",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/alex-taggart-9750221a7",student:"Cole Andrekus"},
+  {name:"Eleanor B.",role:"Senior Mobile Developer",org:"Credera",linkedin:"https://www.linkedin.com/in/eleanorburch",student:"Cole Andrekus"},
+  {name:"Zeena Johar",role:"Entrepreneur in residence",org:"FCV",linkedin:"https://www.linkedin.com/in/zeenajohar/",student:"Darryl Delsoin"},
+  {name:"Duquesne Fednar",role:"Self employed",org:"Independent",linkedin:"https://www.linkedin.com/in/duquesne-fednard-3bba0228/",student:"Darryl Delsoin"},
+  {name:"Sasha Kramer",role:"Executive director",org:"SOIL",linkedin:"https://www.linkedin.com/in/sasha-kramer-23b4b3160/",student:"Darryl Delsoin"},
+  {name:"Yaa Kumah-Crystal",role:"HealthIT Clinical Director",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/yaakumahcrystal/",student:"Darryl Delsoin"},
+  {name:"Rick Fredrickson",role:"Senior Vice President",org:"Centene",linkedin:"https://www.linkedin.com/in/richard-fredrickson-8b83124/",student:"Darryl Delsoin"},
+  {name:"Mike Bellot",role:"Founder",org:"Kaw Academy",linkedin:"https://www.linkedin.com/in/mikebellot/",student:"Darryl Delsoin"},
+  {name:"Dave Meolli",role:"Cardiologist",org:"Vanderbilt (all)",linkedin:"",student:"Darryl Delsoin"},
+  {name:"Carine Roenen",role:"Executive director",org:"Fonkoze",linkedin:"https://www.linkedin.com/in/carine-roenen-7a58b028/",student:"Darryl Delsoin"},
+  {name:"Jean William Pape",role:"Director",org:"GHESKIO",linkedin:"",student:"Darryl Delsoin"},
+  {name:"Leon Pamphile",role:"Founder",org:"FLM Haiti",linkedin:"",student:"Darryl Delsoin"},
+  {name:"Ajar Rajbhandary",role:"Founder and CEO",org:"Herd",linkedin:"https://www.linkedin.com/in/ajar-rajbhandary/",student:"Mitul Patel"},
+  {name:"Numan Dharani",role:"Co-Founder, COO",org:"Hifive",linkedin:"https://www.linkedin.com/in/numan-dharani/",student:"Mitul Patel"},
+  {name:"Keith Marshall",role:"Founder, CEO",org:"The Players' Lounge",linkedin:"https://www.linkedin.com/in/keith-marshall-406b63168/",student:"Mitul Patel"},
+  {name:"Sarah Koch",role:"Dermatologist",org:"Dermatology Group of the Carolinas",linkedin:"https://www.linkedin.com/in/sarah-koch-580b8724/",student:"Mitul Patel"},
+  {name:"Tyler Duff",role:"Strategic Advisor",org:"Family Office",linkedin:"https://www.linkedin.com/in/talastairduff/",student:"Mitul Patel"},
+  {name:"Tonya McLeod",role:"Dermatologist, Partner",org:"Piedmont Plastic Surgery",linkedin:"https://www.linkedin.com/in/tonyamcleod/",student:"Mitul Patel"},
+  {name:"Hunter Hardin",role:"Dermatology Nurse Practitioner",org:"Gold Skin Care Center",linkedin:"https://www.linkedin.com/in/hunter-hardin-msn-fnp-bc-6b7b0091/",student:"Mitul Patel"},
+  {name:"AJ Asness",role:"Investor",org:"Ground Up Ventures",linkedin:"https://www.linkedin.com/in/aj-asness/",student:"Mitul Patel"},
+  {name:"Neelam Khan",role:"Founder & Director",org:"Neely Dermatology",linkedin:"https://www.linkedin.com/in/neelam-khan-47341379/",student:"Mitul Patel"},
+  {name:"Charity McConnell",role:"Owner/Dermatologist",org:"Franklin Dermatology Group",linkedin:"https://www.linkedin.com/in/charity-mcconnell-5959bb93/",student:"Mitul Patel"},
+  {name:"Jessica Day",role:"Partner, M&A",org:"Sidley Austin LLP",linkedin:"https://www.linkedin.com/in/jessica--day/",student:"Courtney Zettel"},
+  {name:"Jacqueline M. Noel",role:"Associate",org:"Sidley Austin LLP",linkedin:"https://www.linkedin.com/in/jacqueline-m-noel-79ab17127/",student:"Courtney Zettel"},
+  {name:"Matthew H. O'Brien",role:"Partner, M&A",org:"Kirkland & Ellis LLP",linkedin:"https://www.linkedin.com/in/matthew-o-brien--/",student:"Courtney Zettel"},
+  {name:"Andrew M. Kaufman",role:"Of Counsel",org:"Kirkland & Ellis LLP",linkedin:"",student:"Courtney Zettel"},
+  {name:"Jessie Wu",role:"Associate",org:"Latham & Watkins LLP",linkedin:"https://www.linkedin.com/in/jessie-wu-993640247/",student:"Courtney Zettel"},
+  {name:"Judy Lee",role:"Associate, Banking",org:"Latham & Watkins LLP",linkedin:"https://www.linkedin.com/in/judy-lee-a2bb22242/",student:"Courtney Zettel"},
+  {name:"Farah Arif",role:"Associate",org:"Latham & Watkins LLP",linkedin:"https://www.linkedin.com/in/farah-arif/",student:"Courtney Zettel"},
+  {name:"Lindsay Ella Mae Hardy",role:"Associate, IP Litigation",org:"Latham & Watkins LLP",linkedin:"https://www.linkedin.com/in/lindsay-hardy/",student:"Courtney Zettel"},
+  {name:"J.T. Parisi",role:"Associate, Restructuring",org:"Latham & Watkins LLP",linkedin:"https://www.linkedin.com/in/j-t-parisi-b39909b9/",student:"Courtney Zettel"},
+  {name:"Colleen Carroll",role:"Associate, Tax",org:"Skadden LLP",linkedin:"https://www.linkedin.com/in/colleen-carroll-1a953053/",student:"Courtney Zettel"},
+  {name:"Kendrice Roc",role:"Digital Strategy Lead",org:"Google",linkedin:"https://www.linkedin.com/in/kendriceroc/",student:"Gabriel Odeyemi"},
+  {name:"Juwon Isola-Osobu",role:"Founder / Senior Product Manager",org:"Oya Active",linkedin:"https://www.linkedin.com/in/juwon-io",student:"Gabriel Odeyemi"},
+  {name:"Mohammed Minhaz",role:"CTO",org:"MzTech Corp",linkedin:"https://www.linkedin.com/in/mminhaz0",student:"Gabriel Odeyemi"},
+  {name:"Todd Johnson",role:"Scout & Venture Partner",org:"Costanoa Ventures",linkedin:"https://www.linkedin.com/in/iamtoddjohnson",student:"Gabriel Odeyemi"},
+  {name:"Ashwat Venkataraman",role:"Digital Transformation Architect",org:"SoftServe",linkedin:"https://www.linkedin.com/in/ashwatvenkataraman",student:"Gabriel Odeyemi"},
+  {name:"Aditya Arora",role:"Global Head of Offerings & Partnerships",org:"Bridgenext",linkedin:"https://www.linkedin.com/in/eradityaarora",student:"Gabriel Odeyemi"},
+  {name:"Trevor Voss",role:"Principal Program Leader, AI",org:"Amazon",linkedin:"https://www.linkedin.com/in/trevor-voss-305a9031",student:"Gabriel Odeyemi"},
+  {name:"Saba Aminu Hassan",role:"Lead, Data Architecture",org:"Abu Dhabi Securities Exchange",linkedin:"https://www.linkedin.com/in/saba-aminu-hassan-2426a9b3",student:"Gabriel Odeyemi"},
+  {name:"Andy Heiman",role:"CFO & Managing Partner",org:"Fat Bottom Brewing",linkedin:"https://www.linkedin.com/in/andy-heiman-79389519",student:"Gabriel Odeyemi"},
+  {name:"Adebayo Omole",role:"Principal Security Lead",org:"Oracle",linkedin:"https://www.linkedin.com/in/adebayo-omole-cissp-cism-cipm-itil-meng-03481058",student:"Gabriel Odeyemi"},
+  {name:"Bella Grace",role:"Health & Wellness Professional",org:"Self Employed",linkedin:"https://www.linkedin.com/in/bella-grace-8793a5a/",student:"Pat Ellison"},
+  {name:"Dominic Wright",role:"Gym Owner",org:"Fitness Unlimited",linkedin:"",student:"Pat Ellison"},
+  {name:"Abbie Wing",role:"Pediatric Occupational Therapist",org:"St Louis Arc",linkedin:"",student:"Pat Ellison"},
+  {name:"Rich Schlosberg",role:"Pediatric Physician",org:"Vanderbilt (all)",linkedin:"",student:"Pat Ellison"},
+  {name:"Chris Reed",role:"Pricing and Analytics",org:"Vanderbilt (all)",linkedin:"",student:"Pat Ellison"},
+  {name:"Nathan Pototschnik",role:"Associate Director Strength & Conditioning",org:"BYU",linkedin:"",student:"Pat Ellison"},
+  {name:"Dan Modlin",role:"COO",org:"Kaiser Permanente",linkedin:"",student:"Pat Ellison"},
+  {name:"Akyah Miranda",role:"Founder",org:"Stealth Startup",linkedin:"",student:"Pat Ellison"},
+  {name:"Alex Morrow",role:"Self employed",org:"Self employed",linkedin:"",student:"Pat Ellison"},
+  {name:"Krista Bonino",role:"Co Founder",org:"F3 Mobile Fitness Solutions",linkedin:"",student:"Pat Ellison"},
+  {name:"Kathleen Seabolt",role:"Executive Director",org:"Vanderbilt Child and Family Center",linkedin:"",student:"Mark Marchetti"},
+  {name:"Cynthia White",role:"Executive Director",org:"Creative Care Center",linkedin:"",student:"Mark Marchetti"},
+  {name:"Courtney Wright",role:"Owner",org:"KidPRO",linkedin:"",student:"Mark Marchetti"},
+  {name:"Cierra P.",role:"Education Director",org:"Vanderbilt Child and Family Center",linkedin:"https://www.linkedin.com/in/cierra-p-49377b74/",student:"Mark Marchetti"},
+  {name:"Amy Thompson",role:"Childcare Associate",org:"Vanderbilt (all)",linkedin:"",student:"Mark Marchetti"},
+  {name:"Shelley Smith",role:"CQI Policy Development",org:"TN Department of Children Services",linkedin:"",student:"Mark Marchetti"},
+  {name:"Amanda Mason",role:"Senior Manager",org:"TN Department of Education",linkedin:"",student:"Mark Marchetti"},
+  {name:"Damentia Wright-Bethune",role:"Owner",org:"Rated G Childcare",linkedin:"",student:"Mark Marchetti"},
+  {name:"Dean Wegner",role:"Founder and CEO",org:"Authentically American",linkedin:"",student:"Mark Marchetti"},
+  {name:"Lindsey Chrismon",role:"Co-Founder",org:"Oply",linkedin:"",student:"Mark Marchetti"},
+  {name:"Tom Kendricks",role:"Ensign",org:"USN",linkedin:"",student:"Adam Morris"},
+  {name:"Mike Peacock",role:"Coding Engineer",org:"Profisee",linkedin:"https://www.linkedin.com/in/mike-peacock-41206b16/",student:"Adam Morris"},
+  {name:"Lucas Jennings",role:"Angel Investor",org:"Hustle Fund",linkedin:"https://www.linkedin.com/in/lucasjennings1/",student:"Adam Morris"},
+  {name:"Cason McLean",role:"Product Manager",org:"Titan Brands",linkedin:"https://www.linkedin.com/in/cason-mclean-42289816b/",student:"Adam Morris"},
+  {name:"Christopher Nolan",role:"Entrepreneur",org:"Arcturus Research",linkedin:"https://www.linkedin.com/in/christopher-nolan-83aba6126/",student:"Adam Morris"},
+  {name:"Christina Downing",role:"Engineer",org:"Tetra technologies",linkedin:"https://www.linkedin.com/in/christina-downing-015060194/",student:"Adam Morris"},
+  {name:"Will Moore",role:"New Products Manager",org:"Winchester",linkedin:"https://www.linkedin.com/in/will-moore-960a3238/",student:"Adam Morris"},
+  {name:"Jeremy Smith",role:"Director of Corp. Relations",org:"Ducks Unlimited",linkedin:"https://www.linkedin.com/in/jeremy-smith-7b056a83/",student:"Adam Morris"},
+  {name:"Haley Menz",role:"Strategy and Development",org:"Tractor Supply",linkedin:"",student:"Adam Morris"},
+  {name:"Savannah Davenport",role:"Marketing & Brand Dev",org:"Barksdale Investment Management",linkedin:"https://www.linkedin.com/in/savannah-davenport/",student:"Adam Morris"},
+  {name:"Micheal G.",role:"Small Business Owner",org:"Dragons Concord",linkedin:"https://www.linkedin.com/in/michaelsgruver/",student:"Pete Goris"},
+  {name:"Timothy Darrah",role:"CEO / Adjunct Professor",org:"Mangrove",linkedin:"https://www.linkedin.com/in/timothydarrah/",student:"Pete Goris"},
+  {name:"Wyatt Frasier",role:"Co-founder",org:"Sitreps",linkedin:"https://www.linkedin.com/in/wyattfrasier/",student:"Pete Goris"},
+  {name:"Emily Douglas",role:"Small Business Owner",org:"Children's Corner Store",linkedin:"https://www.linkedin.com/in/emily-douglas-8b1b799/",student:"Pete Goris"},
+  {name:"Saikat Nandi",role:"Strategic advisor",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/nandisaikat/",student:"Pete Goris"},
+  {name:"Jeremy Padawer",role:"Chief Brand Officer",org:"Jazwares",linkedin:"https://www.linkedin.com/in/jeremy-padawer-68a0a12/",student:"Pete Goris"},
+  {name:"Ian Rountree",role:"General Partner",org:"Cantos",linkedin:"https://www.linkedin.com/in/ianrountree/",student:"Pete Goris"},
+  {name:"Robert Handy",role:"Owner Operator",org:"Bricks & Minifigures",linkedin:"",student:"Pete Goris"},
+  {name:"Raleigh Anne Gray",role:"Chief of Staff",org:"Whatnot",linkedin:"https://www.linkedin.com/in/raleighannegray/",student:"Pete Goris"},
+  {name:"Dusty Floyd",role:"Merchandising Operations",org:"Walmart",linkedin:"https://www.linkedin.com/in/dustyfloyd/",student:"Pete Goris"},
+  {name:"Matthew Peterson",role:"CEO",org:"UHC",linkedin:"https://www.linkedin.com/in/matthewwpeterson/",student:"Emma Ye"},
+  {name:"Eric Eskioglu",role:"CMO/neurosurgeon",org:"Novant Health",linkedin:"https://www.linkedin.com/in/eric-eskioglu",student:"Emma Ye"},
+  {name:"Campbell Liles",role:"Neurosurgery resident",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/campbell-liles-416a2581/",student:"Emma Ye"},
+  {name:"Mike Uchrin",role:"CEO",org:"Monogram health",linkedin:"https://www.linkedin.com/in/mike-uchrin-0b53791/",student:"Emma Ye"},
+  {name:"Jennifer Hyman",role:"CEO",org:"Rent the runway",linkedin:"https://www.linkedin.com/in/jennifer-hyman-14970017/",student:"Emma Ye"},
+  {name:"Mike Pykosz",role:"CEO",org:"Oak health",linkedin:"https://www.linkedin.com/in/mike-pykosz-b910384/",student:"Emma Ye"},
+  {name:"Debra Osteen",role:"CEO",org:"Acadia Healthcare",linkedin:"https://www.linkedin.com/in/debbie-osteen/",student:"Emma Ye"},
+  {name:"Rick W. Wright",role:"CMO",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/rick-wright-33940810/",student:"Emma Ye"},
+  {name:"Vaishali Lalit",role:"AI Development Specialist",org:"Ericsson",linkedin:"https://www.linkedin.com/in/vaishali-lalit-147292aa/",student:"Akshay Dang"},
+  {name:"Karan Kumar",role:"DVP Analytics",org:"Policybazaar",linkedin:"https://www.linkedin.com/in/karan-kumar-55a07392/",student:"Akshay Dang"},
+  {name:"Sushil Bhatt",role:"Senior Manager Commercial",org:"Pharmarack",linkedin:"https://www.linkedin.com/in/sushilb77/",student:"Akshay Dang"},
+  {name:"Vivek Garg",role:"MBA Student",org:"UNC Kenan Flagler",linkedin:"https://www.linkedin.com/in/ivivekgarg/",student:"Akshay Dang"},
+  {name:"Josha Nijssen",role:"Consultant",org:"Tulum Noordwujk",linkedin:"https://www.linkedin.com/in/josha-nijssen-6b01b6297/",student:"Akshay Dang"},
+  {name:"Abhishek Giri",role:"Manager",org:"Indian Oil Corporation Limited",linkedin:"https://www.linkedin.com/in/abhishek-giri-603287199/",student:"Akshay Dang"},
+  {name:"Dwarika Prasad",role:"Senior Manager Engineering",org:"Indian Oil Corporation Limited",linkedin:"https://www.linkedin.com/in/dwarika-prasad-a5366323/",student:"Akshay Dang"},
+  {name:"Rajat Sarowa",role:"Sub Divisional Officer",org:"Govt of India",linkedin:"https://www.linkedin.com/in/rajat-sarowa-098172b6/",student:"Akshay Dang"},
+  {name:"Erin M.",role:"Project Manager / Owner",org:"Sledgehammer Construction",linkedin:"https://www.linkedin.com/in/erin-m-22341260/",student:"Zach Greene"},
+  {name:"Delaney Balmer",role:"Civil Engineering Student",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/delaney-balmer-13151437b/",student:"Zach Greene"},
+  {name:"John Davis",role:"Statewide Project Manager",org:"Tennessee Department of Transportation",linkedin:"https://www.linkedin.com/in/john-davis-47b79415/",student:"Zach Greene"},
+  {name:"Sean McCarty",role:"Sr. Project Manager",org:"Alston Construction",linkedin:"https://www.linkedin.com/in/sean-mccarty-141231106/",student:"Zach Greene"},
+  {name:"Chris Williams",role:"Owner",org:"Williamz Constructors",linkedin:"https://www.linkedin.com/in/chris-williams-545b7930/",student:"Zach Greene"},
+  {name:"Yash Bhavsar",role:"Project Engineer",org:"Garney Construction",linkedin:"https://www.linkedin.com/in/yash-bhavsar22/",student:"Zach Greene"},
+  {name:"Vivek Kodicherla",role:"Product Lead",org:"Airbnb",linkedin:"https://www.linkedin.com/in/vivekkodicherla/",student:"Jacob Latts"},
+  {name:"Chris Long",role:"Founder",org:"Giftwell Studio",linkedin:"https://www.linkedin.com/in/clong88/",student:"Jacob Latts"},
+  {name:"Jameson Mefford-Lee",role:"Global Head of Partnerships",org:"LinkedIn",linkedin:"https://www.linkedin.com/in/jameson-lee/",student:"Jacob Latts"},
+  {name:"Sumeet Shah",role:"Founder & Managing Partner",org:"VHS Ventures",linkedin:"https://www.linkedin.com/in/sumeethshah/",student:"Jacob Latts"},
+  {name:"Sven Skillrud",role:"VP of Total Rewards",org:"Nike",linkedin:"https://www.linkedin.com/in/svenskillrud/",student:"Jacob Latts"},
+  {name:"Henry Cookson",role:"Founder",org:"Cookson Adventures",linkedin:"https://www.linkedin.com/in/henrycookson/",student:"Jacob Latts"},
+  {name:"Adam Lawrence",role:"Founder & CEO",org:"Boom & Bucket",linkedin:"https://www.linkedin.com/in/aslawrence/",student:"Jacob Latts"},
+  {name:"Brett Needelman",role:"Manager of Marketplace Growth",org:"Curri",linkedin:"https://www.linkedin.com/in/brettneedelman/",student:"Jacob Latts"},
+  {name:"Yoni Barkan",role:"VP of Product",org:"Deloitte",linkedin:"https://www.linkedin.com/in/yonibarkan/",student:"Jacob Latts"},
+  {name:"Marla Grossberg",role:"President",org:"Grossberg Consulting",linkedin:"https://www.linkedin.com/in/marlagrossberg/",student:"Jacob Latts"},
+  {name:"Sam Hollis",role:"President",org:"Milestone Construction Company",linkedin:"",student:"Michael Thomas"},
+  {name:"Art Cason",role:"Owner/GM",org:"Royal Range USA",linkedin:"",student:"Michael Thomas"},
+  {name:"Doug Midkiff",role:"Director of Finance",org:"MarketStreet",linkedin:"",student:"Michael Thomas"},
+  {name:"Shannon Farrington",role:"CFO",org:"Premise Health",linkedin:"",student:"Michael Thomas"},
+  {name:"Ben Miller",role:"CRO",org:"Premise Health",linkedin:"",student:"Michael Thomas"},
+  {name:"Brian Smith",role:"VP Finance",org:"Premise Health",linkedin:"",student:"Michael Thomas"},
+  {name:"Shawn Sephan",role:"Director, Defense Division",org:"NEMO Arms",linkedin:"",student:"Michael Thomas"},
+  {name:"Ken Viera",role:"Manager",org:"RMGS Inc.",linkedin:"",student:"Michael Thomas"},
+  {name:"Babak Siavoshy",role:"CFO",org:"Anduril",linkedin:"",student:"Michael Thomas"},
+  {name:"David Glazer",role:"CFO",org:"Palantir",linkedin:"",student:"Michael Thomas"},
+  {name:"Matt Bodnar",role:"Partner",org:"Fresh Hospitality",linkedin:"https://www.linkedin.com/in/mattbodnar/",student:"Rieves Berry"},
+  {name:"Tim Stanton",role:"Operating Partner",org:"Waldo's Chicken & Beer",linkedin:"https://www.linkedin.com/in/tim-stanton-a0604bb/",student:"Rieves Berry"},
+  {name:"Nick Westbrook",role:"Owner Operator",org:"Chick Fil A",linkedin:"https://www.linkedin.com/in/nickwestbrookcfa/",student:"Rieves Berry"},
+  {name:"Zach Roberts",role:"National Real Estate Manager",org:"McDonald's",linkedin:"https://www.linkedin.com/in/zach-roberts-38906415/",student:"Rieves Berry"},
+  {name:"Matthew Loevenguth",role:"Head of RE",org:"In-N-Out",linkedin:"https://www.linkedin.com/in/matthew-loevenguth-cdp-6a665b58/",student:"Rieves Berry"},
+  {name:"Michael Mravle",role:"CFO",org:"In-N-Out",linkedin:"https://www.linkedin.com/in/michael-mravle-763773/",student:"Rieves Berry"},
+  {name:"Jacob Brown",role:"Owner Operator",org:"Brown Bag",linkedin:"https://www.linkedin.com/in/jacobrbrown/",student:"Rieves Berry"},
+  {name:"Matthew Mincer",role:"VP",org:"Brown Bag",linkedin:"https://www.linkedin.com/in/matthew-mincer-13a58bbb/",student:"Rieves Berry"},
+  {name:"Luke Smiley",role:"CEO",org:"Radish Kitchen",linkedin:"https://www.linkedin.com/in/luke-smiley-a094914/",student:"Rieves Berry"},
+  {name:"Sean Heslin",role:"Associate",org:"Fifth Third Bank",linkedin:"https://www.linkedin.com/in/sean-heslin/",student:"Rieves Berry"},
+  {name:"Paige Parker",role:"Founder/CEO",org:"Happenstance Whiskey",linkedin:"https://www.linkedin.com/in/paigesc/",student:"Nick Dailey"},
+  {name:"Thi Lam",role:"Creative Director",org:"Garnish Studios",linkedin:"https://www.linkedin.com/in/thiqlam/",student:"Nick Dailey"},
+  {name:"James Foley",role:"Managing Partner",org:"Fairhope Brewing Company",linkedin:"https://www.linkedin.com/in/james-foley-588b826/",student:"Nick Dailey"},
+  {name:"Jose Carlos Herrara",role:"Co-Founder",org:"Banagua",linkedin:"https://www.linkedin.com/in/josecarlosherrera/",student:"Nick Dailey"},
+  {name:"Robert Smithson",role:"Co-Founder",org:"Banagua",linkedin:"https://www.linkedin.com/in/robert-smithson-48386517/",student:"Nick Dailey"},
+  {name:"Jeff Roberts",role:"Founder",org:"Yellowhammer Coffee",linkedin:"https://www.linkedin.com/in/jeffroberts2/",student:"Nick Dailey"},
+  {name:"Brianna Dacey",role:"Consultant",org:"EY-Parthenon",linkedin:"https://www.linkedin.com/in/brianna-dacey/",student:"Nick Dailey"},
+  {name:"Robbie Nowinski",role:"Founder/CEO",org:"E+Rose",linkedin:"https://www.linkedin.com/in/robbie-nowinski-rd-cnsc-6138a430/",student:"Nick Dailey"},
+  {name:"Chris Cole",role:"Lead Designer",org:"GM",linkedin:"https://www.linkedin.com/in/hellochriscole/",student:"Nick Dailey"},
+  {name:"Laurel Orley",role:"Founder / CEO",org:"Daily Crunch",linkedin:"https://www.linkedin.com/in/laurel-orley/",student:"Nick Dailey"},
+  {name:"Francisco Jose Mora Ros",role:"Footwear Designer",org:"Sneex",linkedin:"https://www.linkedin.com/in/francisco-jos%C3%A9-mora-ros-773213196/",student:"Rowan Baird"},
+  {name:"Patrick Woodyard",role:"Former founder & CEO",org:"Nisolo LLC",linkedin:"https://www.linkedin.com/in/patrick-woodyard-96765b21/",student:"Rowan Baird"},
+  {name:"Josh Kuriakose",role:"Footwear Concept Creator",org:"Nike",linkedin:"https://www.linkedin.com/in/josh-kuriakose-tamu78/",student:"Rowan Baird"},
+  {name:"Carol J Law",role:"Board Member",org:"Intercollegiate Horse Show Association",linkedin:"https://www.linkedin.com/in/carol-j-law-b3837319/",student:"Rowan Baird"},
+  {name:"Samantha Fleming",role:"Secretary, National Board",org:"Interscholastic Equestrian Association",linkedin:"https://www.linkedin.com/in/samantha-fleming-30289252/",student:"Rowan Baird"},
+  {name:"Robert Clarke Miller",role:"Managing Partner",org:"Jigsaw Capital Partners",linkedin:"https://www.linkedin.com/in/robert-clarke-miller-354b3486/",student:"Rowan Baird"},
+  {name:"Joey Kim",role:"CEO",org:"Longview Restoration",linkedin:"https://www.linkedin.com/in/joey-kim/",student:"Rowan Baird"},
+  {name:"Mariana Cedillo",role:"Senior Analyst & Sourcing Strategy Manager",org:"Levi Strauss & Co.",linkedin:"https://www.linkedin.com/in/marina-cedillo-alujas/",student:"Rowan Baird"},
+  {name:"Chris Gallagher",role:"Founder, President & CEO",org:"VIONIC",linkedin:"https://www.linkedin.com/in/chris-gallagher-4b27689/",student:"Rowan Baird"},
+  {name:"Duke Pinner",role:"President",org:"Shoe Horizons Inc",linkedin:"https://www.linkedin.com/in/duke-pinner-63303b32/",student:"Rowan Baird"},
+  {name:"Britney Chia",role:"Strategic Operations Coordinator",org:"Uber",linkedin:"https://www.linkedin.com/in/britney-chia/",student:"Dozie Nwachuku"},
+  {name:"John Rezabek",role:"Senior Product Operations Manager",org:"Uber",linkedin:"https://www.linkedin.com/in/johnlrezabek/",student:"Dozie Nwachuku"},
+  {name:"Hannah M.",role:"Senior Product Manager",org:"Taskrabbit",linkedin:"https://www.linkedin.com/in/hannah-m-42b248161/",student:"Dozie Nwachuku"},
+  {name:"Subhav Pradhan",role:"Software Engineer",org:"Uber",linkedin:"https://www.linkedin.com/in/subhav-pradhan-b87ab737/",student:"Dozie Nwachuku"},
+  {name:"Emeka Onwukwe",role:"Data Engineer",org:"Meta",linkedin:"https://www.linkedin.com/in/cmbonu/",student:"Dozie Nwachuku"},
+  {name:"Patrick Kandawire",role:"Angel Investor, Co-Founder",org:"BAG Collective",linkedin:"https://www.linkedin.com/in/pkandawire/",student:"Dozie Nwachuku"},
+  {name:"Michael Okaro",role:"Principal Product Manager",org:"Amazon (AWS)",linkedin:"https://www.linkedin.com/in/michael-okaro-pe-pmp/",student:"Dozie Nwachuku"},
+  {name:"Da Lei",role:"Product Manager",org:"SLB",linkedin:"https://www.linkedin.com/in/da-lei-70795a1a/",student:"Dozie Nwachuku"},
+  {name:"Edozie Eze",role:"Senior Product Manager",org:"Nvidia",linkedin:"https://www.linkedin.com/in/edozie-e-95930a30/",student:"Dozie Nwachuku"},
+  {name:"Wale Akinfaderin",role:"Senior Data Scientist",org:"Amazon (AWS)",linkedin:"https://www.linkedin.com/in/waleakinfaderin/",student:"Dozie Nwachuku"},
+  {name:"Colin Kenney",role:"Search Fund Entrepreneur",org:"Cothrom Capital",linkedin:"https://www.linkedin.com/in/colinpkenney/",student:"Matthew McMillan"},
+  {name:"Bob Boniface",role:"Search Fund Entrepreneur",org:"Polar Peak Capital",linkedin:"https://www.linkedin.com/in/bob-boniface/",student:"Matthew McMillan"},
+  {name:"Ryan McCostlin",role:"Founder & CEO",org:"Tailwater",linkedin:"https://www.linkedin.com/in/rmccost/",student:"Matthew McMillan"},
+  {name:"Jason Jones",role:"Chief Revenue Officer",org:"Lerner Solutions",linkedin:"https://www.linkedin.com/in/jasongrowthjones/",student:"Matthew McMillan"},
+  {name:"Sara Pidwell Heston",role:"Investor",org:"Anacapa Partners",linkedin:"https://www.linkedin.com/in/sara-pidwell-heston-b203b11/",student:"Matthew McMillan"},
+  {name:"Kyle Pezzi",role:"CEO",org:"Solutions Group Accounting",linkedin:"https://www.linkedin.com/in/kylepezzi/",student:"Matthew McMillan"},
+  {name:"Justin McCloud",role:"Founder/Operator",org:"Mountain Haven Vacation Rentals",linkedin:"https://www.linkedin.com/in/justinmccloud/",student:"Matthew McMillan"},
+  {name:"Ryan Burns",role:"Investor/Operator",org:"ScienceWorks",linkedin:"https://www.linkedin.com/in/rburnsnashville/",student:"Matthew McMillan"},
+  {name:"Gary Dennis",role:"Former CEO/Founder",org:"Mammoth Holdings",linkedin:"https://www.linkedin.com/in/gary-dennis-ga/",student:"Matthew McMillan"},
+  {name:"Jason Colgate",role:"CEO",org:"New Health Investment Group",linkedin:"https://www.linkedin.com/in/jasoncolgate/",student:"Matthew McMillan"},
+  {name:"Jesse McCarthy",role:"Teacher",org:"Harpeth Hall",linkedin:"https://www.linkedin.com/in/jessekmccarthy/",student:"Tristan Carico"},
+  {name:"Valerie Olivas Gomez",role:"Admissions Officer",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/valerie-olivas-gomez-4a4690279/",student:"Tristan Carico"},
+  {name:"Sarah Gay Boswell",role:"Admissions Specialist",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/sarah-gay-boswell-8bb20111/",student:"Tristan Carico"},
+  {name:"Kyra Bolt",role:"Biology Educator",org:"West High School",linkedin:"https://www.linkedin.com/in/kyrabolt/",student:"Tristan Carico"},
+  {name:"Alexis Coulter",role:"College Admissions Coach",org:"Empowerly",linkedin:"https://www.linkedin.com/in/alexis-coulter/",student:"Tristan Carico"},
+  {name:"Ben Bousquet",role:"Director of College Consulting",org:"Sierra Admissions",linkedin:"https://www.linkedin.com/in/benwbousquet/",student:"Tristan Carico"},
+  {name:"Dona Rehm-Robles",role:"Associate Director of College Counseling",org:"Collegiate School",linkedin:"https://www.linkedin.com/in/dona-rehm-robles-0652bb79/",student:"Tristan Carico"},
+  {name:"Matt Christou",role:"Founder (ETA)",org:"Big League Clean",linkedin:"https://www.linkedin.com/in/matthew-christou-a913a1281/",student:"Micky Sangimino"},
+  {name:"Grant Brewster",role:"Founder, HC startup",org:"Good Labs",linkedin:"https://www.linkedin.com/in/grant-brewster-64229a58/",student:"Micky Sangimino"},
+  {name:"Scott Morris",role:"Serial Entrepreneur",org:"Multiple",linkedin:"https://www.linkedin.com/in/scott-morris-3178859/",student:"Micky Sangimino"},
+  {name:"Kekoa MacAuley",role:"Founder, AI integration",org:"The AI Integration Method",linkedin:"https://www.linkedin.com/in/kekoa-macauley-38472a14b/",student:"Micky Sangimino"},
+  {name:"Barton Christmas",role:"Executive Search Professional",org:"Russell Reynolds Associates",linkedin:"https://www.linkedin.com/in/barton-christmas-14392b129/",student:"Micky Sangimino"},
+  {name:"Phil Veber",role:"Principal",org:"Gaingels",linkedin:"https://www.linkedin.com/in/philip-veber-299b31174/",student:"Micky Sangimino"},
+  {name:"Logan Powell",role:"Software Engineer",org:"Meta",linkedin:"https://www.linkedin.com/in/logan-j-powell/",student:"Micky Sangimino"},
+  {name:"Alex Snape",role:"CEO",org:"JD Sound recording studio",linkedin:"https://www.linkedin.com/in/alex-s-611863a3/",student:"Micky Sangimino"},
+  {name:"Chris Ruediger",role:"General Manager",org:"Fort Nash",linkedin:"https://www.linkedin.com/in/chris-ruediger-55a05a165/",student:"Micky Sangimino"},
+  {name:"John Churchwell",role:"Assistant District Attorney",org:"Davidson County DA Office",linkedin:"https://www.linkedin.com/in/john-churchwell-27661b194/",student:"Micky Sangimino"},
+  {name:"Brendan McManus",role:"Partner",org:"Vanderlyn Hospitality Group",linkedin:"https://www.linkedin.com/in/brendancmcmanus",student:"Tyler Ingebrigtsen"},
+  {name:"Ryan Meredith",role:"Leader",org:"Fountain Square Hospitality",linkedin:"",student:"Tyler Ingebrigtsen"},
+  {name:"Caroline Hoyt",role:"Hospitality Professional",org:"Gramercy Tavern",linkedin:"",student:"Tyler Ingebrigtsen"},
+  {name:"Erin Hofmann",role:"President and CEO",org:"Total Joint Orthopedics",linkedin:"",student:"Mike Buckley"},
+  {name:"Travis Richards",role:"Certified Prosthetist/Orthotist",org:"Open Bionics Nashville",linkedin:"",student:"Mike Buckley"},
+  {name:"Michael Parrish",role:"Former Chief Acquisition Officer",org:"Veteran's Affairs",linkedin:"",student:"Mike Buckley"},
+  {name:"David Chi",role:"Hand and reconstructive surgeon",org:"Brown University Health",linkedin:"",student:"Mike Buckley"},
+  {name:"Jeff Morgan",role:"Orthopaedic Surgeon",org:"Veteran's Affairs",linkedin:"",student:"Mike Buckley"},
+  {name:"Jonathan Price",role:"Physical Therapist",org:"Veteran's Affairs",linkedin:"",student:"Mike Buckley"},
+  {name:"S. Charles Neill",role:"Veterans Law Judge",org:"Veteran's Affairs",linkedin:"",student:"Mike Buckley"},
+  {name:"Doug Hudson",role:"Founder, CEO",org:"Allurion Technologies",linkedin:"",student:"Mike Buckley"},
+  {name:"Neal Dillon",role:"Medical Device R&D",org:"Therakos Healthcare",linkedin:"",student:"Mike Buckley"},
+  {name:"Skyler Ashton Dalley",role:"Founder & Presiding Member",org:"Equilateral Product Innovations",linkedin:"",student:"Mike Buckley"},
+  {name:"Sara Brown Fleishman",role:"Marketing Manager",org:"Brown-Forman",linkedin:"https://www.linkedin.com/in/sara-fleishman-12584489/",student:"Hannah Garey"},
+  {name:"Laurel Orley",role:"CEO & Co-Founder",org:"Daily Crunch",linkedin:"https://www.linkedin.com/in/laurel-orley/",student:"Hannah Garey"},
+  {name:"Hank Ingram",role:"Business Development Director",org:"Ingram Industries",linkedin:"https://www.linkedin.com/in/hank-ingram-581081107/",student:"Hannah Garey"},
+  {name:"Paige P",role:"Founder & CEO",org:"Happenstance Whiskey",linkedin:"https://www.linkedin.com/in/paigesc/",student:"Hannah Garey"},
+  {name:"Sydney Dozier",role:"CEO & Founder",org:"Renaissance Marketing Group",linkedin:"https://www.linkedin.com/in/sydneyrdozier/",student:"Hannah Garey"},
+  {name:"Makenna Morris",role:"Marketing & Brand Management",org:"Suntory Global Spirits",linkedin:"https://www.linkedin.com/in/makenna-morris-265791142/",student:"Hannah Garey"},
+  {name:"Mark Scrivner",role:"Founder & CEO",org:"Snapshot Interactive",linkedin:"https://www.linkedin.com/in/markscrivner/",student:"Hannah Garey"},
+  {name:"Colton Mulligan",role:"CEO",org:"FoxFuel",linkedin:"https://www.linkedin.com/in/coltonmulligan/",student:"Hannah Garey"},
+  {name:"Johnny Price",role:"President",org:"WeFunder",linkedin:"https://www.linkedin.com/in/jonnyprice/",student:"Hannah Garey"},
+  {name:"Steven Nicodemo",role:"Brand Manager",org:"Brown Water Spirits",linkedin:"https://www.linkedin.com/in/steven-nicodemo/",student:"Hannah Garey"},
+  {name:"Aki Tuccu",role:"Partner / MD",org:"Goldman Sachs",linkedin:"https://www.linkedin.com/in/akituccu/",student:"Amisha Shreya"},
+  {name:"Ashok Sharma",role:"Managing Director",org:"Goldman Sachs",linkedin:"https://www.linkedin.com/in/ashoke-sharma-7631594/",student:"Amisha Shreya"},
+  {name:"Rohan Roy",role:"Investment Manager",org:"Krafton",linkedin:"https://www.linkedin.com/in/rohan-roy/",student:"Amisha Shreya"},
+  {name:"Dharmesh Chandra",role:"Self Employed / Option Trading",org:"Ex Goldman Sachs",linkedin:"https://www.linkedin.com/in/dharmesh-c-5b1b52165/",student:"Amisha Shreya"},
+  {name:"Mike Scanlon",role:"AI ML Data Operations Program Manager",org:"Apple",linkedin:"https://www.linkedin.com/in/mscanlon/",student:"Amisha Shreya"},
+  {name:"Frank Lawrence",role:"VP global operations",org:"Meta",linkedin:"https://www.linkedin.com/in/franklawrence2/",student:"Amisha Shreya"},
+  {name:"Jessica Osaki",role:"Senior Program Manager",org:"Google",linkedin:"https://www.linkedin.com/in/jessicaosaki/",student:"Amisha Shreya"},
+  {name:"Elena Conner",role:"Product Manager",org:"Google",linkedin:"https://www.linkedin.com/in/elena-conner/",student:"Amisha Shreya"},
+  {name:"Nishanth Kumar",role:"Product Manager",org:"Amazon",linkedin:"https://www.linkedin.com/in/adi2018/",student:"Amisha Shreya"},
+  {name:"Evan Lin",role:"AI Product Leader",org:"Workday",linkedin:"https://www.linkedin.com/in/evanlin/",student:"Amisha Shreya"},
+  {name:"Britney Chia",role:"Strategic Operations Coordinator",org:"Uber",linkedin:"https://www.linkedin.com/in/britney-chia/",student:"Liam Kang"},
+  {name:"Korey McDavid",role:"Founder and President",org:"Juiced Fuel",linkedin:"https://www.linkedin.com/in/korey-mcdavid-mba-33748042/",student:"Liam Kang"},
+  {name:"Johan Hernandez Gomez",role:"Automotive Tech",org:"Toyota / USMC",linkedin:"https://www.linkedin.com/in/johan-hernandez-gomez-793523131/",student:"Liam Kang"},
+  {name:"David Schantz",role:"Founder",org:"Military Onboard Solutions",linkedin:"https://www.linkedin.com/in/dave-schantz-skillbridge-champion/",student:"Liam Kang"},
+  {name:"Jason Feimster",role:"Investor",org:"Moonshine Capital",linkedin:"https://www.linkedin.com/in/jason-vc/",student:"Liam Kang"},
+  {name:"Paul Claxton",role:"Managing Partner",org:"Digerati Investments",linkedin:"https://www.linkedin.com/in/businessmanathletemarine/",student:"Liam Kang"},
+  {name:"Bassem Sa",role:"Founder",org:"Reinbow App",linkedin:"https://www.linkedin.com/in/bassem-sa-173718114/",student:"Liam Kang"},
+  {name:"Hayden Sparks",role:"Mobile Diesel Tech",org:"Snider Fleet Solutions",linkedin:"https://www.linkedin.com/in/hayden-sparks-164a211ab/",student:"Liam Kang"},
+  {name:"Callie Seidman",role:"Director",org:"Lyft",linkedin:"https://www.linkedin.com/in/callieseidman/",student:"Liam Kang"},
+  {name:"Michael Blackburn",role:"Managing Partner",org:"Petra Capital Partners",linkedin:"https://www.linkedin.com/in/michael-blackburn-b080737/",student:"Liam Kang"},
+  {name:"Brian Ungarean",role:"Founder/CEO",org:"Predictive AI Inc",linkedin:"https://www.linkedin.com/in/brian-ungarean-0743576/",student:"Laird George"},
+  {name:"Dennis Cail II",role:"Co-Founder/CEO",org:"Zirtue",linkedin:"https://www.linkedin.com/in/denniscail/",student:"Laird George"},
+  {name:"J Patrick Barley",role:"CEO",org:"Silver Creek Midstream",linkedin:"https://www.linkedin.com/in/j-patrick-barley-2007642b3/",student:"Laird George"},
+  {name:"Zohayr Khoja",role:"Founder/CEO",org:"Total Court Construction",linkedin:"https://www.linkedin.com/in/zohayrkhoja/",student:"Laird George"},
+  {name:"Derek Pedersen",role:"Co-Founder/CEO",org:"Crystal Clearwater Resources",linkedin:"https://www.linkedin.com/in/derek-pedersen-a6a9b016b/",student:"Laird George"},
+  {name:"Emily Morris",role:"Founder/CEO",org:"Emrgy",linkedin:"https://www.linkedin.com/in/emily-a-morris/",student:"Laird George"},
+  {name:"Chris Gerding",role:"Founder/CEO",org:"Boomalang",linkedin:"https://www.linkedin.com/in/chris-gerding/",student:"Laird George"},
+  {name:"Trevor Brimley",role:"Co-Founder",org:"FIKA Infusion + Wellness",linkedin:"https://www.linkedin.com/in/trevorbrimley/",student:"Laird George"},
+  {name:"Brent T",role:"CEO",org:"Rover.com",linkedin:"https://www.linkedin.com/in/brentonturner/",student:"Laird George"},
+  {name:"Mark Harris",role:"CEO",org:"HeroWear",linkedin:"https://www.linkedin.com/in/markharrisphd/",student:"Laird George"},
+  {name:"Jay Davis",role:"Co-Founder",org:"Nashton Company",linkedin:"",student:"Shawn Metzgar"},
+  {name:"Larry Howell",role:"President",org:"Hinton Lumber",linkedin:"",student:"Shawn Metzgar"},
+  {name:"John Pontius",role:"Partner",org:"Capital Alignment Partners",linkedin:"",student:"Shawn Metzgar"},
+  {name:"Jeff Heck",role:"Investor",org:"Southstone Holdings",linkedin:"",student:"Shawn Metzgar"},
+  {name:"Stephen Cook",role:"EMD",org:"LFM Capital",linkedin:"",student:"Shawn Metzgar"},
+  {name:"James Byrd",role:"Director",org:"Gen Cap America",linkedin:"",student:"Shawn Metzgar"},
+  {name:"Zane Hengsperger",role:"Founder",org:"Nox Metals",linkedin:"",student:"Shawn Metzgar"},
+  {name:"Adam Miller",role:"SVP",org:"CORE industrial partners",linkedin:"",student:"Shawn Metzgar"},
+  {name:"Justin Vogt",role:"CEO",org:"Evermore Industries",linkedin:"",student:"Shawn Metzgar"},
+  {name:"Doug Lepisto",role:"Founder",org:"Sleeping Giant Capital",linkedin:"",student:"Shawn Metzgar"},
+  {name:"Reed Hayes",role:"Chief of Staff",org:"Streamside Parks",linkedin:"",student:"Jordan Dunn"},
+  {name:"Clark Buckner",role:"CEO",org:"Relationary Marketing",linkedin:"",student:"Jordan Dunn"},
+  {name:"Nikki Sanz",role:"CEO",org:"GIGGS",linkedin:"",student:"Jordan Dunn"},
+  {name:"Rob Trumble",role:"President & COO",org:"SlickText",linkedin:"",student:"Jordan Dunn"},
+  {name:"Scott Blanchette",role:"Board Chair, Senior Advisor",org:"Arsenal Capital Partners",linkedin:"",student:"Jordan Dunn"},
+  {name:"David Hogan",role:"Senior VP",org:"Ribbon Communications",linkedin:"",student:"Jordan Dunn"},
+  {name:"Joe Moody",role:"Business Mentor & Founder",org:"Harbor Entrepreneur Center",linkedin:"",student:"Jordan Dunn"},
+  {name:"Connor Echols",role:"Senior Director",org:"Silicon Ranch Corporation",linkedin:"",student:"Jordan Dunn"},
+  {name:"John Schneider",role:"President",org:"Benefit Enrollment Services",linkedin:"",student:"Jordan Dunn"},
+  {name:"Nehal Mehta",role:"Director of Strategic Partnerships",org:"Saronic Technologies",linkedin:"",student:"Jordan Dunn"},
+  {name:"Nathaniel Clark",role:"Professor of Clinical Psychiatry",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/nathaniel-clark-b24ab7a1/",student:"Tarek Bhiku"},
+  {name:"Karen Rhea MD",role:"Chief Medical Officer",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/karen-rhea-md-36594211/",student:"Tarek Bhiku"},
+  {name:"Warren Taylor",role:"Professor and Chair of Psychiatry",org:"University of North Carolina",linkedin:"https://www.linkedin.com/in/warren-taylor-369b4833/",student:"Tarek Bhiku"},
+  {name:"Kristopher Kast",role:"Academic psychiatrist",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/kristopher-kast-a57bb884/",student:"Tarek Bhiku"},
+  {name:"Van Dang",role:"Student / Intern at Google",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/vnthanhdng/",student:"Tarek Bhiku"},
+  {name:"Daniel Zhang",role:"Student",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/daniel-a-zhang/",student:"Tarek Bhiku"},
+  {name:"Teresa Surratt",role:"Lead Coder",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/teresa-surratt-7650b3118/",student:"Tarek Bhiku"},
+  {name:"Jason Tan",role:"Software Engineer",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/jasontan/",student:"Tarek Bhiku"},
+  {name:"Caroline Menkes",role:"Investor",org:"Mantis Venture Capital",linkedin:"https://www.linkedin.com/in/caroline-menkes-9b604663/",student:"Tarek Bhiku"},
+  {name:"David Freeman",role:"CEO",org:"Three Six Venture Capital",linkedin:"https://www.linkedin.com/in/david-freeman-0a56b021/",student:"Tarek Bhiku"},
+  {name:"Connor McCarthy",role:"Principal Operations Lead",org:"Chik-fil-a",linkedin:"https://www.linkedin.com/in/connorpmccarthy/",student:"Conor Keenan"},
+  {name:"Ben Torgersen",role:"Executive Officer",org:"US Army",linkedin:"https://www.linkedin.com/in/benjamin-torgersen-8214571a4/",student:"Conor Keenan"},
+  {name:"John Pedersen",role:"VP",org:"BMO Capital Markets",linkedin:"https://www.linkedin.com/in/john-pedersen-91006343/",student:"Conor Keenan"},
+  {name:"Andreas Hamilton",role:"Student",org:"Stanford Business School",linkedin:"https://www.linkedin.com/in/dre-hamilton/",student:"Conor Keenan"},
+  {name:"Alfredo Noriega",role:"Executive Director, Assistant Treasurer",org:"Amgen",linkedin:"https://www.linkedin.com/in/alfredonoriega87/",student:"Conor Keenan"},
+  {name:"Ben Field",role:"Senior Director of Investor Relations",org:"Amgen",linkedin:"https://www.linkedin.com/in/benrfield/",student:"Conor Keenan"},
+  {name:"Mark Corbeil",role:"Chief Operating Officer",org:"Agentis Longevity",linkedin:"https://www.linkedin.com/in/mark-corbeil-422a907b/",student:"Conor Keenan"},
+  {name:"Zach Pasquariello",role:"Fund Manager",org:"Zip Capital",linkedin:"https://www.linkedin.com/in/zachpasq/",student:"Conor Keenan"},
+  {name:"Anil Trinidade",role:"Professor of Medicine",org:"Vanderbilt (all)",linkedin:"https://www.linkedin.com/in/anil-j-trindade-500b9511b/",student:"Conor Keenan"},
+  {name:"Jonathan Cole",role:"Commerce Business Development",org:"Tinuiti",linkedin:"https://www.linkedin.com/in/jonacole/",student:"Conor Keenan"},
+  {name:"Jason Dallas",role:"Acquisitions",org:"Knightvest capital",linkedin:"https://www.linkedin.com/in/jasonmdallas01/",student:"Carter Swayze"},
+  {name:"Tim Middleton",role:"Acquisitions",org:"Independent",linkedin:"https://www.linkedin.com/in/tim-middleton/",student:"Carter Swayze"},
+  {name:"Allison Bradshaw",role:"Co-head of investments",org:"LEM capital",linkedin:"https://www.linkedin.com/in/allison-bradshaw-55b78b/",student:"Carter Swayze"},
+  {name:"Jake Dersovitz",role:"Acquisitions",org:"L&L",linkedin:"https://www.linkedin.com/in/jakedersovitz/",student:"Carter Swayze"},
+  {name:"Peter Fish",role:"Managing Partner",org:"Brookehaven Real Estate",linkedin:"https://www.linkedin.com/in/peter-fish-8524588/",student:"Carter Swayze"},
+  {name:"Scott Vanderhoff",role:"EVP",org:"Mercatus Partners",linkedin:"https://www.linkedin.com/in/scott-vanderhoff-0b21318/",student:"Carter Swayze"},
+  {name:"Leonard Silverstein",role:"Vice Chairman",org:"Horeb Group",linkedin:"https://www.linkedin.com/in/leonard-silverstein-5b033142/",student:"Carter Swayze"},
+  {name:"Carol Womak",role:"Principal",org:"Diversified Trust Company",linkedin:"https://www.linkedin.com/in/carol-womack-b2481212/",student:"Carter Swayze"},
+  {name:"James Rowe",role:"SVP",org:"CW Capital",linkedin:"https://www.linkedin.com/in/james-rowe-mba/",student:"Carter Swayze"},
+  {name:"Marc Salotti",role:"MD",org:"Tradepoint Atlantic",linkedin:"https://www.linkedin.com/in/marcsalotti/",student:"Carter Swayze"},
+  {name:"Gianna DelliCarpini",role:"Chief People Officer",org:"WeWork",linkedin:"https://www.linkedin.com/in/gianna-dellicarpini-baa9a91/",student:"Anna Hyman"},
+  {name:"Colleen Flynn",role:"Director of Marketing",org:"FINTOP",linkedin:"https://www.linkedin.com/in/flynncolleenm/",student:"Anna Hyman"},
+  {name:"Alexandra Sterling",role:"Associate Principal Consultant",org:"Summit Leadership Partners",linkedin:"https://www.linkedin.com/in/alexandrarbrody/",student:"Anna Hyman"},
+  {name:"Netta Dobbins-Cunningham",role:"Founder and Principal Consultant",org:"Netta Dobbins Marketing",linkedin:"https://www.linkedin.com/in/nettadobbins/",student:"Anna Hyman"},
+  {name:"Liz Callahan",role:"Director, Global Events",org:"Global Impact Investing Network",linkedin:"https://www.linkedin.com/in/liz-callahan-10016/",student:"Anna Hyman"},
+  {name:"Valencia Hicks-Harris",role:"Founder and CEO",org:"Empower All Inc.",linkedin:"https://www.linkedin.com/in/valencia-hicks-harris-phd-8a4a4a212/",student:"Anna Hyman"},
+  {name:"Caroline Lucas",role:"Social Impact Strategy Director",org:"Accenture",linkedin:"https://www.linkedin.com/in/lucascaroline/",student:"Anna Hyman"},
+  {name:"Ed Briscoe",role:"Managing Director",org:"Weave Social Finance",linkedin:"https://www.linkedin.com/in/edbriscoe/",student:"Anna Hyman"},
+  {name:"Evelyn Mittler",role:"Social Impact Strategy Manager",org:"Accenture",linkedin:"https://www.linkedin.com/in/evelyn-mittler/",student:"Anna Hyman"},
+  {name:"Jane Murphy",role:"Americas Op Model Lead",org:"Accenture",linkedin:"https://www.linkedin.com/in/jane-murphy-5076972/",student:"Anna Hyman"},
+  {name:"Devin Falkner",role:"Business Owner",org:"SkillWorx",linkedin:"https://www.linkedin.com/in/devin-falkner-a134b834",student:"Tanner Burningham"},
+  {name:"Ander de Olloqui Albarrán",role:"Entrepreneur/Director",org:"AgaveTex",linkedin:"https://www.linkedin.com/in/anderolloqui",student:"Tanner Burningham"},
+  {name:"Zach Burton",role:"Wealth Management Advisor",org:"Northwestern Mutual",linkedin:"https://www.linkedin.com/in/zach-burton-8558249",student:"Tanner Burningham"},
+  {name:"Gardner Brown",role:"Wealth Management Advisor",org:"Northwestern Mutual",linkedin:"https://www.linkedin.com/in/gardner-brown-7059524",student:"Tanner Burningham"},
+  {name:"Grant Todd",role:"CEO/Investor",org:"Dragonfly Pond Works",linkedin:"https://www.linkedin.com/in/grantttodd",student:"Tanner Burningham"},
+  {name:"Greg Ambrosia",role:"Investor/Entrepreneur",org:"CRE Holdings",linkedin:"https://www.linkedin.com/in/gregambrosia",student:"Tanner Burningham"},
+  {name:"Christopher Booker",role:"Entrepreneur/Fund Manager",org:"Hoover Learning Group",linkedin:"https://www.linkedin.com/in/christopher-booker-70935690",student:"Tanner Burningham"},
+  {name:"Jackson Cluff",role:"Professional Athlete/Entrepreneur",org:"New York Mets",linkedin:"https://www.linkedin.com/in/jackson-cluff",student:"Tanner Burningham"},
+  {name:"Bryan Sotelo",role:"Business Owner",org:"Avispa Cleaning",linkedin:"https://www.linkedin.com/in/bryan-sotelo",student:"Tanner Burningham"},
+  {name:"Michael Hodgeman",role:"Business Owner/Account Executive",org:"Hodgepodge Shoes",linkedin:"https://www.linkedin.com/in/michael-hodgman-60aa78103",student:"Tanner Burningham"},
+  {name:"Neal Zuckerman",role:"Senior Partner",org:"Boston Consulting Group",linkedin:"https://www.linkedin.com/in/neal-zuckerman-3506241a/",student:"Will Smith"},
+  {name:"Claire Heinichen",role:"Senior Editor, Country",org:"Spotify",linkedin:"https://www.linkedin.com/in/claireheinichen/",student:"Will Smith"},
+  {name:"Christal Hector",role:"Founder",org:"TuneHatch",linkedin:"https://www.linkedin.com/in/christalhector/",student:"Will Smith"},
+  {name:"Nathan Youseef",role:"Co-Founder",org:"TuneHatch",linkedin:"https://www.linkedin.com/in/nathanyoussef/",student:"Will Smith"},
+  {name:"Kirby Mathews",role:"Vice President, A&R",org:"Back Blocks Music",linkedin:"https://www.linkedin.com/in/kirby-mathews-7684a9bb/",student:"Will Smith"},
+  {name:"Hannah Galluzzi",role:"Vice President, A&R",org:"MCA",linkedin:"https://www.linkedin.com/in/hannah-galluzzi-b36272127/",student:"Will Smith"},
+  {name:"Katherine Godwin",role:"Manager, A&R",org:"Tape Room Records",linkedin:"https://www.linkedin.com/in/katherine-godwin-b32b30195/",student:"Will Smith"},
+  {name:"TC Courtney",role:"A&R Manager",org:"Universal Music Group",linkedin:"https://www.linkedin.com/in/tccourtney/",student:"Will Smith"},
+  {name:"Sean Henry",role:"CEO",org:"Nashville Predators",linkedin:"https://www.linkedin.com/in/sean-henry-297129b/",student:"Jonathan Wilcox"},
+  {name:"Octavius Reid",role:"SVP/Wealth Advisor",org:"Morgan Stanley",linkedin:"https://www.linkedin.com/in/octavius-ted-reid-6865216/",student:"Jonathan Wilcox"},
+  {name:"Joe Pierce",role:"SVP+General Counsel",org:"AMB Sports",linkedin:"https://www.linkedin.com/in/joe-pierce-2333882/",student:"Jonathan Wilcox"},
+  {name:"Kim Davis",role:"SVP",org:"NHL",linkedin:"https://www.linkedin.com/in/kimberly-davis-b8375347/",student:"Jonathan Wilcox"},
+  {name:"Rachel Maltz",role:"Senior Program Manager",org:"City of Carlsbad",linkedin:"https://www.linkedin.com/in/rachelmaltz/",student:"Jonathan Wilcox"},
+  {name:"Courtney Klein",role:"CEO",org:"Storq",linkedin:"https://www.linkedin.com/in/courtklein/",student:"Jonathan Wilcox"},
+  {name:"Ben Somorjai",role:"Hitting Coach",org:"MiLB New York Yankees",linkedin:"https://www.linkedin.com/in/ben-somorjai-319a4198/",student:"Jonathan Wilcox"},
+  {name:"Max Lytvyn",role:"CO-Founder/Board Member",org:"Superhuman",linkedin:"https://www.linkedin.com/in/max-lytvyn/",student:"Jonathan Wilcox"},
+  {name:"Tiara Berry",role:"Manager, Industry Marketing",org:"Clover",linkedin:"https://www.linkedin.com/in/tiarasberry/",student:"Jonathan Wilcox"},
+  {name:"Ander de Olloqui Albarrán",role:"Director",org:"AgaveTex",linkedin:"https://www.linkedin.com/in/anderolloqui/",student:"Jonathan Wilcox"},
+  {name:"Marshall Farmer",role:"Managing Director",org:"Ankura",linkedin:"https://www.linkedin.com/in/marshallfarmer/",student:"Connor Laffler"},
+  {name:"Charlandra Watson",role:"Strategy and Execution Leader",org:"Schneider Electric",linkedin:"https://www.linkedin.com/in/charlandrawatson/",student:"Connor Laffler"},
+  {name:"Bruno Evangelista",role:"Global Director, Strategy",org:"Schneider Electric",linkedin:"https://www.linkedin.com/in/bruno-evangelista-45b4034/",student:"Connor Laffler"},
+  {name:"Sri Bharagava",role:"Strategy Leader",org:"Schneider Electric",linkedin:"https://www.linkedin.com/in/sri-bhargava-pulipaka/",student:"Connor Laffler"},
+  {name:"Walker Mathews Jr.",role:"President",org:"R.C. Mathews Contractor",linkedin:"https://www.linkedin.com/in/walker-mathews-jr-2031b1b/",student:"Connor Laffler"},
+  {name:"Steve Gerten",role:"Sr. Manager/Program Executive",org:"Zoox",linkedin:"https://www.linkedin.com/in/stevegerten/",student:"Connor Laffler"},
+  {name:"James Corlew",role:"VP, Business Development",org:"Moore Construction Inc",linkedin:"https://www.linkedin.com/in/james-corlew-5ab4648/",student:"Connor Laffler"},
+  {name:"Len Pfeiffer",role:"Multi-Family Development Manager",org:"D.R. Horton",linkedin:"https://www.linkedin.com/in/lenpfeiffer/",student:"Connor Laffler"},
+  {name:"Blake Dexter",role:"Cofounder and Board Member",org:"Mapzot",linkedin:"https://www.linkedin.com/in/blake-dexter-6a40a52/",student:"Connor Laffler"},
+  {name:"Ronald Hall",role:"Managing Partner",org:"Power Plant Pros LLC",linkedin:"https://www.linkedin.com/in/ronald-hall-7794a47a/",student:"Connor Laffler"},
+  {name:"Jen Reynolds",role:"Manager, Global Marketing",org:"The Estée Lauder Companies Inc.",linkedin:"https://www.linkedin.com/in/jen-reynolds-652938109/",student:"Lauren McElroy"},
+  {name:"Mariel Golden",role:"Account Executive",org:"Givaudan",linkedin:"https://www.linkedin.com/in/mariel-golden-83a50388/",student:"Lauren McElroy"},
+  {name:"Rominna Laraia",role:"VP of Consumer Activism",org:"Pierre Fabre Group",linkedin:"https://www.linkedin.com/in/rominna-laraia-03252467/",student:"Lauren McElroy"},
+  {name:"Casey Georgeson",role:"Founder/CEO",org:"SAINT JAINE",linkedin:"https://www.linkedin.com/in/casey-saintjane/",student:"Lauren McElroy"},
+  {name:"Sommer Howard",role:"Director of Retail, Fashion & Beauty",org:"Quilt.AI",linkedin:"https://www.linkedin.com/in/sommer-howard/",student:"Lauren McElroy"},
+  {name:"Corin Snyder",role:"Luxe Fragrance Associate",org:"The Estée Lauder Companies Inc.",linkedin:"https://www.linkedin.com/in/corin-snyder-438363217/",student:"Lauren McElroy"},
+  {name:"Laura Hein McElduff",role:"Vice President Fragrance Development",org:"French Color & Fragrance Co",linkedin:"https://www.linkedin.com/in/laura-hein-mcelduff-189aba20/",student:"Lauren McElroy"},
+  {name:"Lori Rudolph-Owen",role:"Chief Development Officer",org:"4:59 NewCo",linkedin:"https://www.linkedin.com/in/lori-rudolph-owen-phd-751317/",student:"Lauren McElroy"},
+  {name:"Kavya Sharman",role:"Founder & Managing Partner",org:"Phase Capital",linkedin:"https://www.linkedin.com/in/kavyasharman/",student:"Lauren McElroy"},
+  {name:"Len Kiczek",role:"VP, Global Account",org:"IFF",linkedin:"https://www.linkedin.com/in/len-kiczek-74022a8/",student:"Lauren McElroy"},
+  {name:"Lucinda Pastora",role:"Scientist II",org:"IFF",linkedin:"https://www.linkedin.com/in/lucinda-e-pastora/",student:"Lauren McElroy"}
+];
+
+const COLORS = ['#378ADD','#1D9E75','#D85A30','#D4537E','#7F77DD','#BA7517','#639922','#888780','#E24B4A'];
+const BADGE_CLASSES = ['badge-blue','badge-teal','badge-coral','badge-amber','badge-purple'];
+
+function showPanel(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function makeBar(label, val, max, color, container) {
+  const pct = Math.round(val / max * 100);
+  container.innerHTML += `<div class="bar-row">
+    <div class="bar-label" title="${label}">${label}</div>
+    <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+    <div class="bar-count">${val}</div>
+  </div>`;
+}
+
+function makeCloud(freq, containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.className = 'wordcloud';
+  const vals = Object.values(freq);
+  const maxV = Math.max(...vals), minV = Math.min(...vals);
+  Object.entries(freq).sort((a,b) => b[1]-a[1]).forEach(([word, cnt], i) => {
+    const norm = (cnt - minV) / (maxV - minV + 1);
+    const size = Math.round(11 + norm * 20);
+    const color = COLORS[i % COLORS.length];
+    const span = document.createElement('span');
+    span.className = 'word';
+    span.style.cssText = `font-size:${size}px;color:${color};background:${color}18;`;
+    span.textContent = word;
+    el.appendChild(span);
+  });
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  // Path donut
+  const pathLabels = Object.keys(DATA.path_cats);
+  const pathVals = Object.values(DATA.path_cats);
+  new Chart(document.getElementById('pathChart'), {
+    type: 'doughnut',
+    data: { labels: pathLabels, datasets: [{ data: pathVals, backgroundColor: COLORS, borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 11 }, boxWidth: 10, padding: 8 } } } }
+  });
+
+  // Top roles bar
+  const roleEl = document.getElementById('rolesBar');
+  const roleEntries = Object.entries(DATA.role_freq).slice(0, 8);
+  roleEntries.forEach(([k,v], i) => makeBar(k, v, roleEntries[0][1], COLORS[i % COLORS.length], roleEl));
+
+  // Submissions per student
+  const subNames = Object.keys(DATA.sub_counts);
+  const subVals = Object.values(DATA.sub_counts);
+  new Chart(document.getElementById('subChart'), {
+    type: 'bar',
+    data: { labels: subNames, datasets: [{ data: subVals, backgroundColor: '#378ADD88', borderColor: '#378ADD', borderWidth: 1 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 }, maxRotation: 45 } }, y: { ticks: { font: { size: 11 } } } } }
+  });
+
+  // Org bars
+  const orgEl = document.getElementById('orgBars');
+  const orgEntries = Object.entries(DATA.org_freq);
+  orgEntries.forEach(([k,v], i) => makeBar(k, v, orgEntries[0][1], COLORS[i % COLORS.length], orgEl));
+
+  // Shared orgs
+  const sharedOrgsEl = document.getElementById('sharedOrgs');
+  DATA.shared_orgs.forEach(([org, students], i) => {
+    sharedOrgsEl.innerHTML += `<div class="shared-item">
+      <span class="badge ${BADGE_CLASSES[i % 5]}">${students.length} students</span>
+      <div><div style="font-size:13px;font-weight:500">${org}</div>
+      <div class="sub-names">${students.join(' · ')}</div></div>
+    </div>`;
+  });
+
+  // Shared people
+  const sharedPeopleEl = document.getElementById('sharedPeople');
+  DATA.shared_people.forEach(([person, students], i) => {
+    sharedPeopleEl.innerHTML += `<div class="shared-item">
+      <span class="badge ${BADGE_CLASSES[i % 5]}">${students.length} students</span>
+      <div><div style="font-size:13px;font-weight:500">${person}</div>
+      <div class="sub-names">${students.join(' · ')}</div></div>
+    </div>`;
+  });
+
+  // Top students
+  const topStudEl = document.getElementById('topStudents');
+  const studEntries = Object.entries(DATA.sub_counts).sort((a,b) => b[1]-a[1]).slice(0, 12);
+  studEntries.forEach(([k,v], i) => makeBar(k, v, studEntries[0][1], COLORS[i % COLORS.length], topStudEl));
+
+  // Path bar chart
+  new Chart(document.getElementById('pathBar'), {
+    type: 'bar',
+    data: { labels: pathLabels, datasets: [{ data: pathVals, backgroundColor: COLORS, borderRadius: 4 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 11 } } }, y: { ticks: { font: { size: 11 } } } } }
+  });
+
+  // Clouds
+  makeCloud(DATA.path_freq, 'pathCloud');
+  makeCloud(DATA.why_freq, 'whyCloud');
+
+  // Role bars 2
+  const roleEl2 = document.getElementById('roleBars2');
+  const roleEntries2 = Object.entries(DATA.role_freq).slice(0, 14);
+  roleEntries2.forEach(([k,v], i) => makeBar(k, v, roleEntries2[0][1], COLORS[i % COLORS.length], roleEl2));
+
+  // Browse table
+  buildTable();
+});
+
+let filtered = CONNECTIONS.filter(c => c.name && c.name.trim());
+let page = 0;
+const PER_PAGE = 25;
+
+function buildTable() {
+  filtered = CONNECTIONS.filter(c => c.name && c.name.trim());
+  page = 0;
+  renderTable();
+}
+
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  filtered = CONNECTIONS.filter(c => {
+    if (!c.name || !c.name.trim()) return false;
+    return !q || c.name.toLowerCase().includes(q) || (c.org||'').toLowerCase().includes(q) || (c.role||'').toLowerCase().includes(q) || (c.student||'').toLowerCase().includes(q);
+  });
+  page = 0;
+  renderTable();
+}
+
+function renderTable() {
+  const body = document.getElementById('connBody');
+  const start = page * PER_PAGE;
+  const slice = filtered.slice(start, start + PER_PAGE);
+  body.innerHTML = slice.map(c => {
+    const li = c.linkedin && c.linkedin.startsWith('http')
+      ? `<a class="conn-link" href="${c.linkedin}" target="_blank">view &#8599;</a>` : '—';
+    return `<tr>
+      <td style="font-weight:500">${c.name}</td>
+      <td style="color:#555;font-size:12px">${c.role || '—'}</td>
+      <td style="font-size:12px">${c.org || '—'}</td>
+      <td><span class="pill">${c.student}</span></td>
+      <td>${li}</td>
+    </tr>`;
+  }).join('');
+  const total = filtered.length;
+  const pages = Math.ceil(total / PER_PAGE);
+  document.getElementById('pageInfo').textContent = `Showing ${Math.min(start+1,total)}–${Math.min(start+PER_PAGE,total)} of ${total} connections`;
+  document.getElementById('pageNum').textContent = `Page ${page+1} of ${pages}`;
+  document.getElementById('prevBtn').disabled = page === 0;
+  document.getElementById('nextBtn').disabled = page >= pages - 1;
+}
+
+function changePage(dir) {
+  const pages = Math.ceil(filtered.length / PER_PAGE);
+  page = Math.max(0, Math.min(pages - 1, page + dir));
+  renderTable();
+}
+</script>
+</body>
+</html>
